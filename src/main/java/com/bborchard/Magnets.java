@@ -1,12 +1,17 @@
 package com.bborchard;
 
-import jdk.nashorn.internal.ir.Block;
-
 import static com.bborchard.Magnets.Charge.NEG;
 import static com.bborchard.Magnets.Charge.NONE;
 import static com.bborchard.Magnets.Charge.POS;
 
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Stack;
+import java.util.stream.Stream;
 
 public class Magnets {
 
@@ -22,7 +27,6 @@ public class Magnets {
 
     puzzle = new Puzzle(requirements);
 
-
     // flags to help with proper magnet creation
     boolean skipNext = false;
     boolean[] skipArray = new boolean[grid.length];
@@ -30,7 +34,6 @@ public class Magnets {
     int i = 0;
     for (char[] row : grid) {
       int j = 0;
-
 
       for (char c : row) {
         if (!skipNext && !skipArray[j]) {
@@ -41,18 +44,18 @@ public class Magnets {
           b.col = puzzle.cols[j];
           if (c == '#') {
             addAdjacents(b, i, j, false, false);
-            o = puzzle.rows[i].blocks[j+1];
+            o = puzzle.rows[i].blocks[j + 1];
             o.row = puzzle.rows[i];
-            o.col = puzzle.cols[j+1];
-            addAdjacents(o, i, j+1, true, false);
+            o.col = puzzle.cols[j + 1];
+            addAdjacents(o, i, j + 1, true, false);
             skipNext = true;
             skipArray[j] = false;
           } else {
             addAdjacents(b, i, j, false, true);
-            o = puzzle.rows[i+1].blocks[j];
-            o.row = puzzle.rows[i+1];
+            o = puzzle.rows[i + 1].blocks[j];
+            o.row = puzzle.rows[i + 1];
             o.col = puzzle.cols[j];
-            addAdjacents(o, i+1, j, true, true);
+            addAdjacents(o, i + 1, j, true, true);
             skipArray[j] = true;
             skipNext = false;
           }
@@ -70,17 +73,17 @@ public class Magnets {
 
   private void addAdjacents(Block block, int row, int col, boolean other, boolean vertical) {
     List<Block> adjacents = new ArrayList<>();
-    if ( row != 0 && (!other || !vertical) ) {
-      adjacents.add(puzzle.rows[row-1].blocks[col]);
+    if (row != 0 && (!other || !vertical)) {
+      adjacents.add(puzzle.rows[row - 1].blocks[col]);
     }
-    if ( col != 0 && (!other || vertical) ) {
-      adjacents.add(puzzle.rows[row].blocks[col-1]);
+    if (col != 0 && (!other || vertical)) {
+      adjacents.add(puzzle.rows[row].blocks[col - 1]);
     }
-    if ( row != puzzle.rows.length-1 && (other || !vertical) ) {
-      adjacents.add(puzzle.rows[row+1].blocks[col]);
+    if (row != puzzle.rows.length - 1 && (other || !vertical)) {
+      adjacents.add(puzzle.rows[row + 1].blocks[col]);
     }
-    if ( col != puzzle.rows.length-1 && (other || vertical) ) {
-      adjacents.add(puzzle.rows[row].blocks[col+1]);
+    if (col != puzzle.rows.length - 1 && (other || vertical)) {
+      adjacents.add(puzzle.rows[row].blocks[col + 1]);
     }
     block.adjacents = adjacents.toArray(new Block[adjacents.size()]);
   }
@@ -94,26 +97,51 @@ public class Magnets {
     int currentColIndex = 0;
     boolean fillingRows = true;
     while (true) {
-      Section currentSection = fillingRows ? puzzle.rows[currentRowIndex] : puzzle.cols[currentColIndex];
-      debug("Working on %s %s with charge %s; %s left to place", fillingRows ? "row" : "col", fillingRows ? currentRowIndex : currentColIndex, currentCharge, currentSection.blocksLeft(currentCharge));
-      while (currentSection.blocksLeft(currentCharge) > 0 && (fillingRows ? currentColIndex : currentRowIndex) != currentSection.blocks.length) {
+      Section currentSection =
+          fillingRows ? puzzle.rows[currentRowIndex] : puzzle.cols[currentColIndex];
+      debug(
+          "Working on %s %s with charge %s; %s left to place",
+          fillingRows ? "row" : "col",
+          fillingRows ? currentRowIndex : currentColIndex,
+          currentCharge,
+          currentSection.blocksLeft(currentCharge));
+      while (currentSection.blocksLeft(currentCharge) > 0
+          && (fillingRows ? currentColIndex : currentRowIndex) != currentSection.blocks.length) {
         Block currBlock = currentSection.blocks[fillingRows ? currentColIndex : currentRowIndex];
         if (currBlock.trySet(currentCharge)) {
-          debug("Successfully added block at %s, %s with charge %s", currentColIndex, currentRowIndex, currentCharge);
+          debug(
+              "Successfully added block at %s, %s with charge %s",
+              currentColIndex, currentRowIndex, currentCharge);
           guessStack.push(new Guess(currBlock, currentRowIndex, currentColIndex, fillingRows));
         }
-        if (fillingRows) currentColIndex++; else currentRowIndex++;
+        if (fillingRows) {
+          currentColIndex++;
+        } else {
+          currentRowIndex++;
+        }
       }
       if (currentSection.blocksLeft(currentCharge) <= 0) {
-        debug("%s %s is satisfied with charge %s", fillingRows ? "Row" : "Col", fillingRows ? currentRowIndex : currentColIndex, currentCharge);
+        debug(
+            "%s %s is satisfied with charge %s",
+            fillingRows ? "Row" : "Col",
+            fillingRows ? currentRowIndex : currentColIndex,
+            currentCharge);
         // row was satisfied - continue
-        if(fillingRows) currentColIndex = 0; else currentRowIndex = 0;
+        if (fillingRows) {
+          currentColIndex = 0;
+        } else {
+          currentRowIndex = 0;
+        }
         if (currentCharge == POS) {
           currentCharge = NEG;
         } else {
           currentCharge = POS;
-          if (fillingRows) currentRowIndex++; else currentColIndex++;
-          if ( (fillingRows ? currentRowIndex : currentColIndex) == puzzle.rows.length ) {
+          if (fillingRows) {
+            currentRowIndex++;
+          } else {
+            currentColIndex++;
+          }
+          if ((fillingRows ? currentRowIndex : currentColIndex) == puzzle.rows.length) {
             if (fillingRows) {
               fillingRows = false;
               currentRowIndex = 0;
@@ -134,7 +162,11 @@ public class Magnets {
             System.exit(1);
           }
           Guess lastGuess = guessStack.pop();
-          debug("%s %s failed with charge %s", fillingRows ? "Row" : "Col", fillingRows ? currentRowIndex : currentColIndex, currentCharge);
+          debug(
+              "%s %s failed with charge %s",
+              fillingRows ? "Row" : "Col",
+              fillingRows ? currentRowIndex : currentColIndex,
+              currentCharge);
           currentCharge = lastGuess.block.charge;
           lastGuess.block.fullUnset();
           fillingRows = lastGuess.fillingRows;
@@ -177,18 +209,20 @@ public class Magnets {
       charge = NONE;
     }
 
-    /**
-     * returns whether it's possible to put this charge here
-     */
+    /** returns whether it's possible to put this charge here */
     public boolean possible(Charge charge) {
       boolean possible = true;
 
       // is it empty
-      if (this.charge != NONE) {return false;}
+      if (this.charge != NONE) {
+        return false;
+      }
 
       // check adjacency
       for (Block block : adjacents) {
-        if (block.charge == charge) {return false;}
+        if (block.charge == charge) {
+          return false;
+        }
       }
 
       // check section requirements
@@ -337,7 +371,6 @@ public class Magnets {
     public String toString() {
       return printVal;
     }
-
   }
 
   public static void debug(String message, Object... params) {
@@ -346,24 +379,36 @@ public class Magnets {
     }
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     debug = true;
 
-    Magnets m = new Magnets( new char[][] {
-            new char[] {'@', '#', '#', '#', '#', '@', '#', '#'},
-            new char[] {'@', '@', '@', '@', '#', '#', '@', '@'},
-            new char[] {'@', '@', '@', '@', '#', '#', '#', '#'},
-            new char[] {'@', '#', '#', '@', '@', '#', '#', '@'},
-            new char[] {'#', '#', '#', '#', '@', '@', '@', '@'},
-            new char[] {'@', '#', '#', '#', '#', '@', '@', '@'},
-            new char[] {'@', '#', '#', '#', '#', '#', '#', '@'},
-            new char[] {'#', '#', '#', '#', '#', '#', '#', '#'},
-    }, new int[][] {
-            new int[] {-1, 2, -1, 1, -1, 3, -1, 2},
-            new int[] {3, -1, 4, -1, 2, -1, 1, -1},
-            new int[] {-1, 2, -1, 4, -1, 1, -1, 2},
-            new int[] {2, -1, 2, -1, 1, -1, 3, -1},
-    });
+    if (args.length != 1) {
+      System.err.println("usage: Magnets <puzzle_file>");
+      System.exit(1);
+    }
+    Iterator<String> lines = Files.readAllLines(Paths.get(args[0])).iterator();
+
+    List<char[]> grid = new ArrayList<>();
+    for (String line = lines.next();
+        line != null && !"".equals(line) && lines.hasNext();
+        line = lines.next()) {
+      grid.add(line.toCharArray());
+    }
+
+    List<int[]> requirements = new ArrayList<>();
+    for (String line = lines.next();
+        line != null && !"".equals(line) && lines.hasNext();
+        line = lines.next()) {
+      requirements.add(
+          Stream.of(line.split(",")).map(s -> s.trim()).mapToInt(Integer::parseInt).toArray());
+    }
+
+    // read all left over lines
+    while (lines.hasNext()) {
+      lines.next();
+    }
+
+    Magnets m = new Magnets(grid.toArray(new char[0][0]), requirements.toArray(new int[0][0]));
     m.solve();
   }
 }
